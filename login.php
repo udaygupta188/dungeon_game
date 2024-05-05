@@ -3,16 +3,6 @@ require_once "dbConn.php";
 // Set response header and echo JSON response
 header('Content-Type: application/json; charset=UTF-8');
 
-// Check if the request method is GET
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    // Method not allowed
-    http_response_code(405);
-    $response['status'] = false;
-    $response['message'] = "Method not allowed. Only POST Method are allowed.";
-    echo json_encode($response);
-    exit;
-}
-
 // Check if username and password are provided
 if (!isset($_GET['username']) || !isset($_GET['password'])) {
     $response['status'] = false;
