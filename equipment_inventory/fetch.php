@@ -3,7 +3,9 @@ require_once "../dbConn.php";
 
 try {
     // Prepare and execute the SQL query
-    $sql = $conn->prepare("SELECT * FROM equipment_inventory");
+    $sql = $conn->prepare("SELECT ei.Head,ei.Body,ei.Foot,ei.weapon,u.username FROM equipment_inventory AS ei
+    INNER JOIN users AS u
+    ON u.id=ei.userID");
     $sql->execute();
     
     // Fetch all rows from the query result
