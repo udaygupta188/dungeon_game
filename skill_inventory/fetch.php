@@ -1,9 +1,9 @@
 <?php
-require_once "dbConn.php";
+require_once "../dbConn.php";
 
 try {
     // Prepare and execute the SQL query
-    $sql = $conn->prepare("SELECT * FROM diaryinventory");
+    $sql = $conn->prepare("SELECT * FROM skill_inventory");
     $sql->execute();
     
     // Fetch all rows from the query result
