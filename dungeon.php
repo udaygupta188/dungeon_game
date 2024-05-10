@@ -1,11 +1,10 @@
 <?php
 include_once('connect.php');
 
-
 // Fetch all user IDs
 $getUsersQuery = "SELECT id FROM users WHERE in_dungeon='0' ORDER BY RAND() LIMIT 3";
-$result = mysqli_query($con, $getUsersQuery);
-$userIDs = mysqli_fetch_all($result, MYSQLI_ASSOC);
+$userResult = mysqli_query($con, $getUsersQuery);
+$userIDs = mysqli_fetch_all($userResult, MYSQLI_ASSOC);
 
 // Include the logged-in user
 $username = $_GET['username']; // Replace with the logged-in user's username
@@ -88,6 +87,8 @@ mysqli_query($con, $updateUserQuery);
 // Close database connection
 mysqli_close($con);
 
+mysqli_close($con);
+
 // Function to get a random ID from a given table
 function getRandomIDFromTable($table, $con,$id) {
     $query = "SELECT $id FROM $table ORDER BY RAND() LIMIT 1";
@@ -95,5 +96,3 @@ function getRandomIDFromTable($table, $con,$id) {
     $row = mysqli_fetch_assoc($result);
     return $row[$id];
 }
-
-mysqli_close($con);
