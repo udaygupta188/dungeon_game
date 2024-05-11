@@ -11,7 +11,7 @@ $userResult = mysqli_query($conn, $getUsersQuery);
 $userIDs = mysqli_fetch_all($userResult, MYSQLI_ASSOC);
 
 // Include the logged-in user
-$username = $_GET['username'];
+$username = $_GET['username']; // Replace with the logged-in user's username
 $password = $_GET['password']; // Replace with the logged-in user's password
 
 // Query to select the logged-in user's ID
@@ -60,36 +60,67 @@ $updateQuery .= ")";
 mysqli_query($conn, $updateQuery);
 
 // Select random IDs from dungeon_move and dungeon_monster tables
-$move_id = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
-
+$dungeon_move_id = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
 $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
 
 // Update active_dungeon table with random IDs
-$updateQuery = "UPDATE active_dungeon SET dungeon_move_1=$move_id,dungeon_move_2=$move_id+1,dungeon_move_3=$move_id+2,dungeon_move_4=$move_id+3,dungeon_move_5=$move_id+4, dungeon_monster_id=$dungeon_monster_id WHERE dungeon_id={$newlyInserteDungeondID}";
+$updateQuery = "UPDATE active_dungeon SET dungeon_move_id=$dungeon_move_id, dungeon_monster_id=$dungeon_monster_id WHERE dungeon_id={$newlyInserteDungeondID}";
 mysqli_query($conn, $updateQuery);
-
 
 // Loop 100 times
 for ($i = 0; $i < 100; $i++) {
 
-    // Fetch current values of dungeon_move_2 to dungeon_move_5
-    $dunSelectStmt = "SELECT dungeon_move_1,dungeon_move_2, dungeon_move_3, dungeon_move_4, dungeon_move_5 FROM active_dungeon WHERE user_id='{$loggedInUser['id']}'";
-    $dunResult = mysqli_query($conn, $dunSelectStmt);
-    $dunRow = mysqli_fetch_assoc($dunResult);
+    // Execute query to fetch active dungeon information
+    $activeDungeonQuery = "SELECT * FROM active_dungeon WHERE user_id = '{$loggedInUser['id']}'";
+    $activeDungeonResult = mysqli_query($conn, $activeDungeonQuery);
 
-    // Update active_dungeon table with new values
-    $updateStmt = "UPDATE active_dungeon SET 
-                    dungeon_move_1=dungeon_move_5+1,
-                    dungeon_move_2={$dunRow['dungeon_move_1']},
-                    dungeon_move_3={$dunRow['dungeon_move_2']},
-                    dungeon_move_4={$dunRow['dungeon_move_3']},
-                    dungeon_move_5={$dunRow['dungeon_move_4']} 
-                    WHERE user_id='{$loggedInUser['id']}'";
+    // Check if the query was executed successfully
+    if (!$activeDungeonResult) {
+        die('Error fetching active dungeon data: ' . mysqli_error($conn));
+    }
 
-    mysqli_query($conn, $updateStmt);
+    // Fetch active dungeon row
+    $activeDungeonRow = mysqli_fetch_assoc($activeDungeonResult);
 
+    // Loop to select and update 5 random moves
+    for ($j = 0; $j < 5; $j++) {
+    
+         // Check if any rows were fetched
+        if ($activeDungeonRow) {
+            // Check the number of rows in active_dungeon table for the same user
+            $countQuery = "SELECT COUNT(*) AS count FROM active_dungeon WHERE user_id={$activeDungeonRow['user_id']}";
+            $countResult = mysqli_query($conn, $countQuery);
 
+            // Check if the query was executed successfully
+            if ($countResult) {
+                $row = mysqli_fetch_assoc($countResult);
+                $rowCount = $row['count'];
+            } else {
+                die('Error fetching row count: ' . mysqli_error($conn));
+            }
+        } else {
+            // Handle case where no rows were fetched
+            die('No active dungeon data found for dungeon ID: ' . $newlyInserteDungeondID);
+        }
 
+        // Select random IDs from dungeon_move and dungeon_monster tables
+        $dungeon_move_id = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+        $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
+
+        if($rowCount < 6){
+            // Insert a new row into active_dungeon table
+            $dungeonInsertQuery = "INSERT INTO active_dungeon (user_id,dungeon_move_id, dungeon_monster_id,team1_id,team2_id,team3_id) 
+            VALUES ($activeDungeonRow[user_id],$dungeon_move_id, $dungeon_monster_id,$activeDungeonRow[team1_id],$activeDungeonRow[team2_id],$activeDungeonRow[team3_id])";
+            mysqli_query($conn, $dungeonInsertQuery);
+        }
+
+        // If more than 5 rows, delete the oldest rows to maintain 5 rows
+        if ($rowCount > 5) {
+            $deleteQuery = "DELETE FROM active_dungeon WHERE user_id = $activeDungeonRow[user_id] ORDER BY dungeon_id ASC LIMIT 1";
+            mysqli_query($conn, $deleteQuery);
+        }
+        
+    }
 
     // Pause execution for 10 seconds
     sleep(10);
@@ -117,4 +148,3 @@ function getRandomIDFromTable($table, $conn,$id) {
     $row = mysqli_fetch_assoc($result);
     return $row[$id];
 }
-
