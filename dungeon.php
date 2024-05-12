@@ -59,13 +59,28 @@ $updateQuery .= ")";
 // Execute the update query
 mysqli_query($conn, $updateQuery);
 
+$excludeIDs =array();
+
 // Select random IDs from dungeon_move and dungeon_monster tables
-$move_id = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+$move_id1 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+array_push($excludeIDs, $move_id1);
+
+$move_id2 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+array_push($excludeIDs, $move_id2);
+
+$move_id3 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+array_push($excludeIDs, $move_id3);
+
+$move_id4 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+array_push($excludeIDs, $move_id4);
+
+$move_id5 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+array_push($excludeIDs, $move_id5);
 
 $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
 
 // Update active_dungeon table with random IDs
-$updateQuery = "UPDATE active_dungeon SET dungeon_move_1=$move_id,dungeon_move_2=$move_id+1,dungeon_move_3=$move_id+2,dungeon_move_4=$move_id+3,dungeon_move_5=$move_id+4, dungeon_monster_id=$dungeon_monster_id WHERE dungeon_id={$newlyInserteDungeondID}";
+$updateQuery = "UPDATE active_dungeon SET dungeon_move_1=$move_id1,dungeon_move_2=$move_id2,dungeon_move_3=$move_id3,dungeon_move_4=$move_id4,dungeon_move_5=$move_id5, turns=0,dungeon_monster_id=$dungeon_monster_id WHERE dungeon_id={$newlyInserteDungeondID}";
 mysqli_query($conn, $updateQuery);
 
 
@@ -77,19 +92,19 @@ for ($i = 0; $i < 100; $i++) {
     $dunResult = mysqli_query($conn, $dunSelectStmt);
     $dunRow = mysqli_fetch_assoc($dunResult);
 
+    $move_id_new = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+
     // Update active_dungeon table with new values
     $updateStmt = "UPDATE active_dungeon SET 
-                    dungeon_move_1=dungeon_move_5+1,
-                    dungeon_move_2={$dunRow['dungeon_move_1']},
-                    dungeon_move_3={$dunRow['dungeon_move_2']},
-                    dungeon_move_4={$dunRow['dungeon_move_3']},
-                    dungeon_move_5={$dunRow['dungeon_move_4']} 
-                    WHERE user_id='{$loggedInUser['id']}'";
+    turns=turns+1,
+    dungeon_move_1=$move_id_new, 
+    dungeon_move_2={$dunRow['dungeon_move_1']},
+    dungeon_move_3={$dunRow['dungeon_move_2']},
+    dungeon_move_4={$dunRow['dungeon_move_3']},
+    dungeon_move_5={$dunRow['dungeon_move_4']} 
+    WHERE user_id='{$loggedInUser['id']}'";
 
     mysqli_query($conn, $updateStmt);
-
-
-
 
     // Pause execution for 10 seconds
     sleep(10);
@@ -110,9 +125,14 @@ mysqli_query($conn, $deleteQuery);
 // Close database connection
 mysqli_close($conn);
 
-// Function to get a random ID from a given table
-function getRandomIDFromTable($table, $conn,$id) {
-    $query = "SELECT $id FROM $table ORDER BY RAND() LIMIT 1";
+// Function to get a random ID from a given table, excluding IDs already selected
+function getRandomIDFromTable($table, $conn, $id, $excludeIDs = array()) {
+    $excludeString = '';
+    if (!empty($excludeIDs)) {
+        $excludeString = "WHERE $id NOT IN (" . implode(',', $excludeIDs) . ")";
+    }
+
+    $query = "SELECT $id FROM $table $excludeString ORDER BY RAND() LIMIT 1";
     $result = mysqli_query($conn, $query);
     $row = mysqli_fetch_assoc($result);
     return $row[$id];
