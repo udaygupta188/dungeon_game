@@ -65,56 +65,50 @@ $excludeIDs =array();
 $move_id1 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
 array_push($excludeIDs, $move_id1);
 
-$move_id2 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
-array_push($excludeIDs, $move_id2);
-
-$move_id3 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
-array_push($excludeIDs, $move_id3);
-
-$move_id4 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
-array_push($excludeIDs, $move_id4);
-
-$move_id5 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
-array_push($excludeIDs, $move_id5);
-
 // Update active_dungeon table with random IDs
-$updateQuery = "UPDATE active_dungeon SET dungeon_move_1=$move_id1,dungeon_move_2=$move_id2,dungeon_move_3=$move_id3,dungeon_move_4=$move_id4,dungeon_move_5=$move_id5, turns=0 WHERE dungeon_id={$newlyInserteDungeondID}";
+$updateQuery = "UPDATE active_dungeon SET dungeon_move_1=$move_id1,dungeon_move_2=0,dungeon_move_3=0,dungeon_move_4=0,dungeon_move_5=0, turns=1 WHERE dungeon_id={$newlyInserteDungeondID}";
 mysqli_query($conn, $updateQuery);
 
+sleep(10);
 
 // Loop 100 times
-for ($i = 0; $i < 100; $i++) {
+while (true) {
 
     // Fetch current values of dungeon_move_2 to dungeon_move_5
-    $dunSelectStmt = "SELECT dungeon_move_1,dungeon_move_2, dungeon_move_3, dungeon_move_4, dungeon_move_5,user_id, team1_id, team2_id, team3_id FROM active_dungeon WHERE user_id='{$loggedInUser['id']}'";
+    $dunSelectStmt = "SELECT dungeon_move_1,dungeon_move_2, dungeon_move_3, dungeon_move_4, dungeon_move_5,user_id, team1_id, team2_id, team3_id,turns FROM active_dungeon WHERE user_id='{$loggedInUser['id']}'";
     $dunResult = mysqli_query($conn, $dunSelectStmt);
     $dunRow = mysqli_fetch_assoc($dunResult);
+    if($dunRow['turns'] <= 100){
 
-    $move_id_new = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
+        $move_id_new = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
 
-    // Update active_dungeon table with new values
-    $updateStmt = "UPDATE active_dungeon SET 
-    turns=turns+1,
-    dungeon_move_1=$move_id_new, 
-    dungeon_move_2={$dunRow['dungeon_move_1']},
-    dungeon_move_3={$dunRow['dungeon_move_2']},
-    dungeon_move_4={$dunRow['dungeon_move_3']},
-    dungeon_move_5={$dunRow['dungeon_move_4']} 
-    WHERE user_id='{$loggedInUser['id']}'";
+        // Update active_dungeon table with new values
+        $updateStmt = "UPDATE active_dungeon SET 
+        turns=turns+1,
+        dungeon_move_1=$move_id_new, 
+        dungeon_move_2={$dunRow['dungeon_move_1']},
+        dungeon_move_3={$dunRow['dungeon_move_2']},
+        dungeon_move_4={$dunRow['dungeon_move_3']},
+        dungeon_move_5={$dunRow['dungeon_move_4']} 
+        WHERE user_id='{$loggedInUser['id']}'";
 
-    mysqli_query($conn, $updateStmt);
+        mysqli_query($conn, $updateStmt);
 
-    $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
+        $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
+        if(mt_rand(0, 100) <= 10){
 
-    //Start Fight
-    fight($dungeon_monster_id, $dunRow['user_id'],$i);
-    fight($dungeon_monster_id, $dunRow['team1_id'],$i);
-    fight($dungeon_monster_id, $dunRow['team2_id'],$i);
-    fight($dungeon_monster_id, $dunRow['team3_id'],$i);
-
-    // Pause execution for 10 seconds
-    sleep(10);
-    
+            //Start Fight
+            fight($dungeon_monster_id, $dunRow['user_id']);
+            fight($dungeon_monster_id, $dunRow['team1_id']);
+            fight($dungeon_monster_id, $dunRow['team2_id']);
+            fight($dungeon_monster_id, $dunRow['team3_id']);
+        }
+        
+        // Pause execution for 10 seconds
+        sleep(10);
+    }else{
+        break;
+    }
 }
 
 $stmt = "SELECT user_id, team1_id, team2_id, team3_id FROM active_dungeon WHERE user_id='{$loggedInUser['id']}'";
@@ -145,7 +139,7 @@ function getRandomIDFromTable($table, $conn, $id, $excludeIDs = array()) {
     return $row[$id];
 }
 
-function fight($monsterId, $playerId,$turns=0){
+function fight($monsterId, $playerId){
     global $conn;
 
     // Array to store user_quotes
@@ -217,27 +211,26 @@ function fight($monsterId, $playerId,$turns=0){
             $newMHp = 0;
         }
 
-        $sql = "UPDATE dungeon_monsters SET HP=$newMHp WHERE DMonster_ID=$monsterId";
-        $conn->query($sql);
-        $m_hp = $newMHp;
-        // echo "Player dealt $damage damage. Monster HP left: $m_hp.<br>";
+        // $sql = "UPDATE dungeon_monsters SET HP=$newMHp WHERE DMonster_ID=$monsterId";
+        // $conn->query($sql);
+        // $m_hp = $newMHp;
 
-        // Update player quote
-        $randomUserQuote = array_rand($user_quotes);
-        $sql = "UPDATE `users` SET `quote_id`='U:$randomUserQuote' WHERE ID=$playerId";
-        $conn->query($sql);
+        // "Player dealt $damage damage. Monster HP left";
 
-        sleep(2);
+        // // Update player quote
+        // $randomUserQuote = array_rand($user_quotes);
+        // $sql = "UPDATE `users` SET `quote_id`='U:$randomUserQuote' WHERE ID=$playerId";
+        // $conn->query($sql);
 
         if ($m_hp <= 0) {
             $randomexp = (rand(1, 10));
             $sql = "UPDATE users SET exp = $p_exp + $randomexp WHERE ID=$playerId";
             $conn->query($sql);
-            // echo "Player won $randomexp!.<br>";
+            // "Player won $randomexp!";
             $randomegold = (rand(1, 10));
             $sql = "UPDATE users SET gold = $p_gold + $randomegold WHERE ID=$playerId";
             $conn->query($sql);
-            // echo "Player get $randomegold GOLD.<br>";
+            // "Player get $randomegold GOLD.";
             $sql = "UPDATE users SET win = $p_win + 1 WHERE ID=$playerId";
             $conn->query($sql);
         }
@@ -261,7 +254,6 @@ function fight($monsterId, $playerId,$turns=0){
     $randomMonsterQuote = array_rand($monster_quotes);
     $sql = "UPDATE `users` SET `quote_id`='M:$randomMonsterQuote' WHERE ID=$playerId";
     $conn->query($sql);
-    sleep(2);
 
     if ($p_hp <= 0) {
         $randomegold = (rand(1, 5));
@@ -271,26 +263,23 @@ function fight($monsterId, $playerId,$turns=0){
         }
         $sql = "UPDATE users SET gold = $newGold  WHERE ID=$playerId";
         $conn->query($sql);
-        // echo "Player lost $randomegold GOLD.<br>";
+        // "Player lost GOLD";
 
         $sql = "UPDATE users SET lose = $p_lose + 1 WHERE ID=$playerId";
         $conn->query($sql);
-        // echo "Player lose point added.<br>";
+        // "Player lose point added";
 
         $randomexp2 = (rand(1, 3));
         $sql = "UPDATE users SET exp = $p_exp + $randomexp2 WHERE ID=$playerId";
         $conn->query($sql);
-        // echo "Player lost but get $randomexp2!.<br>";
-
+        // "Player lost";
     }
 
-    if($turns==99){
-        // Restore monster HP
-        $sql = "UPDATE dungeon_monsters SET HP={$monster['HP']} WHERE DMonster_ID=$monsterId";
-        $conn->query($sql);
-    
-        // Restore monster id in user to -1
-        $sql_updateMonster = "UPDATE users SET `monster`=-1 WHERE ID=$playerId";
-        $conn->query($sql_updateMonster);
-    }
+    // // Restore monster HP
+    // $sql = "UPDATE dungeon_monsters SET HP={$monster['HP']} WHERE DMonster_ID=$monsterId";
+    // $conn->query($sql);
+
+    // Restore monster id in user to -1
+    $sql_updateMonster = "UPDATE users SET `monster`=-1 WHERE ID=$playerId";
+    $conn->query($sql_updateMonster);
 }
