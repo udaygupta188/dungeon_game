@@ -44,6 +44,11 @@ if ($loggedInUser) {
 
     $userIDs[] = $loggedInUser;
 }
+$monsterArry = [];
+$monsterArryToRestore = [];
+$excludeDiedMonsterIDs =array();
+$excludeMoveIDs =array();
+$playerKilled =array();
 
 $updateQuery = "UPDATE users SET in_dungeon='1' WHERE id IN (";
 
@@ -60,17 +65,17 @@ $updateQuery .= ")";
 // Execute the update query
 mysqli_query($conn, $updateQuery);
 
-$excludeIDs =array();
 
 // Select random IDs from dungeon_move and dungeon_monster tables
-$move_id1 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
-array_push($excludeIDs, $move_id1);
+$move_id1 = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id',$excludeMoveIDs);
+array_push($excludeMoveIDs, $move_id1);
 
 // Update active_dungeon table with random IDs
 $updateQuery = "UPDATE active_dungeon SET dungeon_move_1=$move_id1,dungeon_move_2=0,dungeon_move_3=0,dungeon_move_4=0,dungeon_move_5=0, turns=1 WHERE dungeon_id={$newlyInserteDungeondID}";
 mysqli_query($conn, $updateQuery);
 
 sleep(10);
+
 
 // Loop 100 times
 while (true) {
@@ -80,50 +85,47 @@ while (true) {
     $dunResult = mysqli_query($conn, $dunSelectStmt);
     $dunRow = mysqli_fetch_assoc($dunResult);
 
-    if($dunRow['turns'] <= 20){
+    echo '<br>Current Turn is '.$dunRow['turns'].'<br>';
 
-        // $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
-        if(mt_rand(0, 100) <= 10){
+    $teamIDs = array($dunRow['user_id'], $dunRow['team1_id'], $dunRow['team2_id'], $dunRow['team3_id']);
 
-            $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID');
-            // Update active_dungeon table with random Monster
-            $updateQuery = "UPDATE active_dungeon SET dungeon_monster_id=$dungeon_monster_id WHERE user_id={$loggedInUser['id']}";
-            mysqli_query($conn, $updateQuery);
+    // Check if all team IDs are dead then stop dungeon
+    if (empty(array_diff($teamIDs, $playerKilled))) {
+        echo 'All Players Dead';
+        break;
+    }
 
-            echo "<br>fight started <br/>";
-            //Start Fight
-            fight($dungeon_monster_id, $dunRow['user_id']);
-            fight($dungeon_monster_id, $dunRow['team1_id']);
-            fight($dungeon_monster_id, $dunRow['team2_id']);
-            fight($dungeon_monster_id, $dunRow['team3_id']);
-            
+    if($dunRow['turns'] <= 10){
 
-        }else{
+     
+        $chances = mt_rand(0, 100);
+
+        if ($chances>=50) {
             
             $move_id_new = getRandomIDFromTable('dungeon_move_quotes', $conn, 'move_quote_id');
 
-//---------------------------------------
+            //---------------------------------------
 
-// Array to hold column names
-$columnNames = ['dungeon_move_1', 'dungeon_move_2', 'dungeon_move_3', 'dungeon_move_4'];
+            // Array to hold column names
+            $columnNames = ['dungeon_move_1', 'dungeon_move_2', 'dungeon_move_3', 'dungeon_move_4','dungeon_move_5'];
 
-// Loop through each column name
-foreach ($columnNames as $columnName) {
-    // Check if $dunRow is not null and if the column exists in $dunRow
-    if (!empty($dunRow) && array_key_exists($columnName, $dunRow) && $dunRow[$columnName] !== null) {
-        // Select the corresponding move_quote from dungeon_move_quotes table
-        $testSql = "SELECT move_quote FROM dungeon_move_quotes WHERE move_quote_id={$dunRow[$columnName]}";
-        $testSqlResult = mysqli_query($conn, $testSql);
-        $testSqlRow = mysqli_fetch_assoc($testSqlResult);
-        // Output the move_quote
-        $len = is_null($testSqlRow) ? '' : $testSqlRow['move_quote'];
+            // Loop through each column name
+            foreach ($columnNames as $columnName) {
+                // Check if $dunRow is not null and if the column exists in $dunRow
+                if (!empty($dunRow) && array_key_exists($columnName, $dunRow) && $dunRow[$columnName] !== null) {
+                    // Select the corresponding move_quote from dungeon_move_quotes table
+                    $testSql = "SELECT move_quote FROM dungeon_move_quotes WHERE move_quote_id={$dunRow[$columnName]}";
+                    $testSqlResult = mysqli_query($conn, $testSql);
+                    $testSqlRow = mysqli_fetch_assoc($testSqlResult);
+                    // Output the move_quote
+                    $len = is_null($testSqlRow) ? '' : $testSqlRow['move_quote'];
 
-        echo $len .'</br> ';
-    }
-}
+                    echo $len .'</br> ';
+                }
+            }
 
-echo '<br></br>';
-//-------------------------------------------
+            // echo '<br> Moving Started<br>';
+            //-------------------------------------------
             
             // Update active_dungeon table with new values
             $updateStmt = "UPDATE active_dungeon SET 
@@ -132,10 +134,106 @@ echo '<br></br>';
             dungeon_move_2={$dunRow['dungeon_move_1']},
             dungeon_move_3={$dunRow['dungeon_move_2']},
             dungeon_move_4={$dunRow['dungeon_move_3']},
-            dungeon_move_5={$dunRow['dungeon_move_4']} 
+            dungeon_move_5={$dunRow['dungeon_move_4']},
+            dungeon_monster_id = null 
             WHERE user_id='{$loggedInUser['id']}'";
 
             mysqli_query($conn, $updateStmt);
+        }else{
+
+            // if(mt_rand(0, 100) <= 10){
+                if (!empty($monsterArry)) {
+                    $lastMonsterId = array_key_last($monsterArry);
+                    $lastMonsterHPValue = end($monsterArry); // Get the value of the last element
+                } else {
+                    $lastMonsterHPValue = 0;
+                }
+
+                if($lastMonsterHPValue>0){
+                    $dungeon_monster_id = $lastMonsterId;
+                }else{
+    
+                    $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID',$excludeDiedMonsterIDs);
+                }
+    
+                // Update active_dungeon table with random Monster
+                $updateQuery = "UPDATE active_dungeon SET dungeon_monster_id=$dungeon_monster_id WHERE user_id={$loggedInUser['id']}";
+                mysqli_query($conn, $updateQuery);
+    
+                echo "<br>Fight started <br/>";
+                //Start Fight
+                if (!in_array($dunRow['user_id'], $playerKilled)){
+                    if (!empty($monsterArry)) {
+                        $lastMonsterId = array_key_last($monsterArry);
+                        $lastMonsterHPValue = end($monsterArry); // Get the value of the last element
+                    } else {
+                        $lastMonsterHPValue = 0;
+                    }
+                    
+                    
+                    if($lastMonsterHPValue>0){
+                        $dungeon_monster_id = $lastMonsterId;
+                    }else{
+        
+                        $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID',$excludeDiedMonsterIDs);
+                    }
+                    fight($dungeon_monster_id, $dunRow['user_id']);
+                    // echo  'last monster HP<br>'.$lastMonsterHPValue.'<br>';
+                }
+                if (!in_array($dunRow['team1_id'], $playerKilled)){
+                    if (!empty($monsterArry)) {
+                        $lastMonsterId = array_key_last($monsterArry);
+                        $lastMonsterHPValue = end($monsterArry); // Get the value of the last element
+                    } else {
+                        $lastMonsterHPValue = 0;
+                    }
+                    
+    
+                    if($lastMonsterHPValue>0){
+                        $dungeon_monster_id = $lastMonsterId;
+                    }else{
+        
+                        $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID',$excludeDiedMonsterIDs);
+                    }
+                    fight($dungeon_monster_id, $dunRow['team1_id']);
+                    echo $lastMonsterHPValue.' last monster HP<br>';
+                }
+                if (!in_array($dunRow['team2_id'], $playerKilled)){
+                    if (!empty($monsterArry)) {
+                        $lastMonsterId = array_key_last($monsterArry);
+                        $lastMonsterHPValue = end($monsterArry); // Get the value of the last element
+                    } else {
+                        $lastMonsterHPValue = 0;
+                    }
+                    
+                    if($lastMonsterHPValue>0){
+                        $dungeon_monster_id = $lastMonsterId;
+                    }else{
+        
+                        $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID',$excludeDiedMonsterIDs);
+                    }
+                    fight($dungeon_monster_id, $dunRow['team2_id']);
+                    echo $lastMonsterHPValue.' last monster HP<br>';
+                }
+                if (!in_array($dunRow['team3_id'], $playerKilled)){
+                    if (!empty($monsterArry)) {
+                        $lastMonsterId = array_key_last($monsterArry);
+                        $lastMonsterHPValue = end($monsterArry); // Get the value of the last element
+                    } else {
+                        $lastMonsterHPValue = 0;
+                    }
+                    if($lastMonsterHPValue>0){
+                        $dungeon_monster_id = $lastMonsterId;
+                    }else{
+        
+                        $dungeon_monster_id = getRandomIDFromTable('dungeon_monsters', $conn, 'DMonster_ID',$excludeDiedMonsterIDs);
+                    }
+                    fight($dungeon_monster_id, $dunRow['team3_id']);
+                    echo $lastMonsterHPValue.' last monster HP<br>';
+                }
+    
+            // }
+
         }
         
         // Pause execution for 10 seconds
@@ -157,6 +255,15 @@ mysqli_query($conn, $updateUserQuery);
 $deleteQuery = "DELETE FROM active_dungeon WHERE user_id='{$loggedInUser['id']}'";
 mysqli_query($conn, $deleteQuery);
 
+
+foreach ($monsterArryToRestore as $key => $value) {
+   //update hp of Monster
+    $sql = "UPDATE dungeon_monsters SET HP=$value WHERE DMonster_ID=$key";
+    $conn->query($sql);
+    echo 'Monster '.$key.' HP filled';
+
+}
+
 // Close database connection
 mysqli_close($conn);
 
@@ -174,7 +281,7 @@ function getRandomIDFromTable($table, $conn, $id, $excludeIDs = array()) {
 }
 
 function fight($monsterId, $playerId){
-    global $conn,$loggedInUser;
+    global $conn,$loggedInUser,$excludeDiedMonsterIDs,$playerKilled,$monsterArry,$monsterArryToRestore;
     
     // Array to store monster_quotes
     $monster_quotes = array();
@@ -203,6 +310,16 @@ function fight($monsterId, $playerId){
 
     $m_hp = $monster['HP'];
 
+    echo 'Monster '.$monsterId.' is Playing <br>';
+    
+    if (!isset($monsterArryToRestore[$monsterId])) {
+        $monsterArryToRestore[$monsterId] = $m_hp;
+    }
+    // if (!isset($monsterArry[$monsterId])) {
+        $monsterArry[$monsterId] = $m_hp;
+    // }
+
+
     // Get initial player HP
     $p_hp = $player['c_hp'];
 
@@ -228,18 +345,30 @@ function fight($monsterId, $playerId){
 
         // Update monster HP 
         $newMHp = $m_hp - $damage;
-        if ($newMHp < 0) {
+        if ($newMHp <= 0) {
             $newMHp = 0;
+            array_push($excludeDiedMonsterIDs, $monsterId);
         }
-            //update hp of Monster
-            $sql = "UPDATE dungeon_monsters SET HP=$m_hp WHERE DMonster_ID=$monsterId";
-            $conn->query($sql);
-            echo "Player $columnName Attack to monster MHP is: $newMHp <br/>";
 
-            // Update player quote
-            $randomMonsterQuote = array_rand($monster_quotes);
-            $sql = "UPDATE `active_dungeon` SET `dungeon_move_1`='$randomMonsterQuote' WHERE $columnName=$playerId";
+        //update hp of Monster
+        $sql = "UPDATE dungeon_monsters SET HP=$newMHp WHERE DMonster_ID=$monsterId";
+        $conn->query($sql);
+        echo "Player $columnName Attack to monster MHP is: $newMHp <br/>";
+
+        // // Update player quote
+        // $randomMonsterQuote = array_rand($monster_quotes);
+        // $sql = "UPDATE `active_dungeon` SET `dungeon_move_1`='$randomMonsterQuote' WHERE $columnName=$playerId";
+        // $conn->query($sql);
+
+        // if($newMHp>0){
+        //     fight($monsterId, $playerId);
+        // }
+        if($newMHp <=0){
+            // Monster value null if he died player quote
+            $sql = "UPDATE `active_dungeon` SET dungeon_monster_id=null WHERE $columnName=$playerId";
             $conn->query($sql);
+            echo 'Monster Id Set to Null in active dungeon -------<br>';
+        }
     }else{
           // Monster attacks
         $damage = $monster['Attack'] - $player['defence'];
@@ -248,10 +377,14 @@ function fight($monsterId, $playerId){
         }
         // Update player HP
         $newPHp = $p_hp - $damage;
-        if ($newPHp < 0) {
+        if ($newPHp <= 0) {
+            array_push($playerKilled,$playerId);
             $newPHp = 0;
         }
-       
+        // if($newPHp>0){
+        //     fight($monsterId, $playerId);
+        // }
+
         if($playerId !=$loggedInUser['id']){
             $cpColumnName = substr($columnName, 0, -2).'hp';
         
@@ -260,22 +393,9 @@ function fight($monsterId, $playerId){
             $conn->query($sql);
             echo "Monster Attack $cpColumnName HP is: $newPHp <br/>";
         }
-
     }
-
-    // if($playerId !=$loggedInUser['id']){
-    //     $cpColumnName = substr($columnName, 0, -2).'hp';
-    
-    //     //update c_hp of player
-    //     $sql = "UPDATE active_dungeon SET $cpColumnName=$newPHp WHERE $columnName=$playerId";
-    //     $conn->query($sql);
-    // }
-
-
-    
-
-  
 }
+
 
 
 function checkColumn($teamId){
